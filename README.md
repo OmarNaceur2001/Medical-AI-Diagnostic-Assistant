@@ -1,169 +1,226 @@
-# Breast Cancer UI — Diagnostic Assisté par IA
+# Medical AI Diagnostic Assistant
 
-Application web de démonstration basée sur **FastAPI** pour l’analyse d’images médicales avec **PyTorch**.  
-Le projet expose deux modèles de classification pré-entraînés, avec génération d’explications visuelles via **Grad-CAM** :
+AI-powered medical imaging diagnostic assistant built with **PyTorch**, **EfficientNet-B0**, **Grad-CAM**, and **FastAPI**. The application provides a web interface and API endpoints for breast histopathology and brain MRI image classification.
 
-- **Breast histopathology** : classification binaire `Benign / Malignant`
-- **Brain MRI** : classification multi-classes `Glioma / Meningioma / No Tumor / Pituitary`
+> This project is intended for education, research, and portfolio demonstration. It is not a certified medical device and must not be used as a substitute for clinical diagnosis.
 
-> ⚠️ Ce projet est destiné à la recherche, au prototypage et à la démonstration. Il ne remplace pas un avis médical ni un dispositif validé en production clinique.
+## Repository Description
 
-## Fonctionnalités
+Use this text in the GitHub repository description:
 
-- Interface web légère pour téléverser une image et obtenir une prédiction instantanée
-- Deux parcours de prédiction distincts : sein et cerveau
-- Retour des probabilités de classe
-- Visualisation Grad-CAM pour comprendre les zones les plus influentes dans la décision
-- API simple compatible avec des intégrations futures côté front-end ou services tiers
+```text
+AI-powered medical imaging diagnostic assistant using PyTorch, EfficientNet, Grad-CAM and FastAPI for Breast Cancer and Brain Tumor classification.
+```
+
+Recommended GitHub topics:
+
+```text
+artificial-intelligence deep-learning pytorch medical-imaging healthtech fastapi gradcam computer-vision breast-cancer brain-tumor machine-learning
+```
+
+## Features
+
+- Breast histopathology classification: `Benign` or `Malignant`
+- Brain MRI classification: `Glioma`, `Meningioma`, `No Tumor`, or `Pituitary`
+- Grad-CAM heatmap generation for visual model explainability
+- FastAPI backend with image upload endpoints
+- Browser-based interface for quick testing and demonstration
+- Model inference using EfficientNet-B0 checkpoints
+
+## Demo
+
+Add validated screenshots in the `screenshots/` directory before sharing the project publicly.
+
+### Main Interface
+
+![Main Interface](screenshots/interface_main.png)
+
+### Breast Cancer Prediction
+
+![Breast Demo](screenshots/breast_demo.png)
+
+### Brain MRI Prediction
+
+![Brain Demo](screenshots/brain_demo.png)
+
+### Grad-CAM Explanation
+
+![Grad-CAM Demo](screenshots/gradcam_demo.png)
+
+## Results
+
+The metrics below should be filled using a held-out test set or a reproducible validation notebook.
+
+### Breast Histopathology
+
+| Metric | Score |
+| --- | --- |
+| Accuracy | TBD |
+| Precision | TBD |
+| Recall | TBD |
+| F1-Score | TBD |
+
+### Brain MRI
+
+| Metric | Score |
+| --- | --- |
+| Accuracy | TBD |
+| Precision | TBD |
+| Recall | TBD |
+| F1-Score | TBD |
 
 ## Architecture
 
-Le serveur charge deux modèles au démarrage :
+The backend loads two model checkpoints at startup:
 
-- `model/final_model.pth` pour le cas **breast**
-- `model/brain_model.pth` pour le cas **brain**
+- `model/final_model.pth` for breast histopathology classification
+- `model/brain_model.pth` for brain MRI classification
 
-Le pipeline de traitement comprend :
+Inference pipeline:
 
-1. Chargement de l’image au format RGB
-2. Prétraitement standardisé avec `Resize(160, 160)` et normalisation ImageNet
-3. Inférence avec **EfficientNet-B0**
-4. Calcul des probabilités de sortie
-5. Génération d’une carte **Grad-CAM**
-6. Retour de la prédiction au format JSON
+1. Load the uploaded image as RGB
+2. Resize to `160 x 160`
+3. Normalize using ImageNet statistics
+4. Run inference with EfficientNet-B0
+5. Convert logits to class probabilities
+6. Generate a Grad-CAM heatmap from the final feature layer
+7. Return prediction, confidence, probabilities, and explainability output
 
-## Stack technique
+## Tech Stack
 
-- **Backend** : FastAPI, Uvicorn
-- **Deep Learning** : PyTorch, TorchVision
-- **Image processing** : Pillow, OpenCV, NumPy
-- **Visualisation** : Matplotlib
-- **Interface** : HTML/CSS/JS servie par FastAPI
+- **Backend:** FastAPI, Uvicorn
+- **Deep Learning:** PyTorch, TorchVision
+- **Computer Vision:** Pillow, OpenCV, NumPy
+- **Visualization:** Matplotlib, Grad-CAM
+- **Frontend:** HTML, CSS, JavaScript
 
-## Prérequis
-
-- Python 3.10+ recommandé
-- Les fichiers de modèles doivent être présents dans le dossier `model/`
-- Les images doivent être fournies au format `multipart/form-data`
-
-## Installation
-
-### 1. Créer un environnement virtuel
-
-```bash
-python -m venv .venv
-```
-
-### 2. Activer l’environnement
-
-**Windows**
-
-```bash
-.venv\Scripts\activate
-```
-
-**macOS / Linux**
-
-```bash
-source .venv/bin/activate
-```
-
-### 3. Installer les dépendances
-
-```bash
-pip install fastapi uvicorn torch torchvision opencv-python matplotlib pillow python-multipart numpy
-```
-
-## Lancement
-
-```bash
-uvicorn app:app --host 127.0.0.1 --port 8000
-```
-
-Puis ouvrir :
-
-- [http://127.0.0.1:8000](http://127.0.0.1:8000)
-
-## Utilisation
-
-1. Ouvrir l’interface web
-2. Choisir le mode :
-   - **Breast histopathology**
-   - **Brain MRI**
-3. Importer une image
-4. Lancer la prédiction
-5. Consulter :
-   - la classe prédite
-   - le niveau de confiance
-   - la heatmap Grad-CAM
-
-## API
-
-### `GET /`
-
-Retourne l’interface web principale.
-
-### `POST /predict/breast`
-
-Prédit `Benign` ou `Malignant` à partir d’une image histopathologique.
-
-**Champ attendu**
-
-- `image` : fichier image
-
-### `POST /predict/brain`
-
-Prédit l’une des 4 classes cérébrales :
-
-- `Glioma`
-- `Meningioma`
-- `No Tumor`
-- `Pituitary`
-
-**Champ attendu**
-
-- `image` : fichier image
-
-## Réponses API
-
-Les endpoints de prédiction renvoient un JSON contenant :
-
-- `prediction` : classe prédite
-- `confidence` : confiance en pourcentage
-- `gradcam_image` : image Grad-CAM encodée en base64
-
-Pour le modèle cerveau, la réponse inclut aussi :
-
-- `all_probs` : distribution complète des probabilités par classe
-
-## Structure du projet
+## Project Structure
 
 ```text
 .
 ├── app.py
 ├── model/
-│   ├── final_model.pth
-│   └── brain_model.pth
+│   ├── brain_model.pth
+│   └── final_model.pth
+├── screenshots/
+│   └── .gitkeep
 ├── static/
 ├── templates/
 │   └── index.html
+├── .gitignore
 └── README.md
 ```
 
-## Notes de conception
+## Installation
 
-- Le chargement des modèles est effectué au démarrage du serveur.
-- Le front-end utilise une seule interface pour commuter entre les deux modes.
-- Les cartes Grad-CAM sont générées côté serveur et renvoyées directement à l’interface.
-- Le projet peut servir de base pour une future intégration PACS / DICOM ou pour exposer d’autres modèles médicaux.
+Create and activate a virtual environment:
 
-## Limites
+```bash
+python -m venv .venv
+```
 
-- Le système n’est pas conçu pour un usage clinique sans validation réglementaire.
-- Les prédictions dépendent fortement de la qualité, de la modalité et de la cohérence des images fournies.
-- Les seuils et les modèles fournis doivent être recalibrés avant tout déploiement réel.
+On Windows:
 
-## Licence
+```bash
+.venv\Scripts\activate
+```
 
-À définir selon l’usage du projet et les contraintes de diffusion.
+On macOS or Linux:
 
+```bash
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Run Locally
+
+```bash
+uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+Open the application:
+
+```text
+http://127.0.0.1:8000
+```
+
+## API Reference
+
+### `GET /`
+
+Returns the main web interface.
+
+### `POST /predict/breast`
+
+Runs breast histopathology classification.
+
+Request field:
+
+```text
+image: image file
+```
+
+Response fields:
+
+```json
+{
+  "prediction": "Benign or Malignant",
+  "confidence": 92.5,
+  "threshold_used": 0.5,
+  "gradcam_image": "base64-encoded PNG"
+}
+```
+
+### `POST /predict/brain`
+
+Runs brain MRI classification.
+
+Request field:
+
+```text
+image: image file
+```
+
+Response fields:
+
+```json
+{
+  "prediction": "Glioma",
+  "confidence": 91.2,
+  "all_probs": {
+    "Glioma": 91.2,
+    "Meningioma": 3.4,
+    "No Tumor": 2.1,
+    "Pituitary": 3.3
+  },
+  "gradcam_image": "base64-encoded PNG"
+}
+```
+
+## Model Explainability
+
+The project uses Grad-CAM to highlight image regions that contribute most strongly to a prediction. This is useful for inspection and model debugging, especially in medical imaging workflows where explainability is critical.
+
+## Limitations
+
+- The project is not clinically validated.
+- The output depends on input image quality, modality, and preprocessing consistency.
+- The current models should be recalibrated and evaluated before any real-world deployment.
+- Grad-CAM explanations are visual aids, not proof of clinical correctness.
+
+## Roadmap
+
+- Add DICOM support for PACS-oriented workflows
+- Add reproducible evaluation notebooks
+- Add Docker deployment
+- Add automated tests for API endpoints
+- Add model cards with dataset and metric details
+
+## License
+
+License to be defined.
