@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroScan AI — Medical Image Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0b0c0f;
+    --surface:  #13151a;
+    --border:   rgba(255,255,255,0.07);
+    --border-hi:rgba(255,255,255,0.15);
+    --text:     #e8e9ec;
+    --muted:    #6b6f7a;
+    --accent-b: #4fc3f7;   /* breast — cyan */
+    --accent-r: #ef9a9a;   /* brain  — rose */
+    --accent:   var(--accent-b);
+    --malignant:#ff6b6b;
+    --benign:   #69db7c;
+    --mono:     'DM Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 1rem 4rem;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* subtle grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    width: 100%; max-width: 660px;
+    position: relative; z-index: 1;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 3rem 0 2.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+  .logo-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: .6rem;
+  }
+  .logo-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+    transition: background .4s, box-shadow .4s;
+    flex-shrink: 0;
+  }
+  .logo-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    transition: color .4s;
+  }
+  header h1 {
+    font-size: clamp(26px, 5vw, 34px);
+    font-weight: 300;
+    letter-spacing: -.5px;
+    line-height: 1.2;
+    color: var(--text);
+  }
+  header h1 em { font-style: italic; color: var(--muted); }
+  .tagline {
+    margin-top: .5rem;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  /* ── Model switcher ── */
+  .switcher {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 1.25rem;
+  }
+  .switch-btn {
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+  }
+  .switch-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .switch-btn.breast::before { background: linear-gradient(135deg, rgba(79,195,247,.08), transparent); }
+  .switch-btn.brain::before  { background: linear-gradient(135deg, rgba(239,154,154,.08), transparent); }
+  .switch-btn:hover { border-color: var(--border-hi); color: var(--text); }
+  .switch-btn:hover::before { opacity: 1; }
+  .switch-btn.active {
+    color: var(--text);
+    border-color: var(--accent);
+  }
+  .switch-btn.active.breast { border-color: var(--accent-b); }
+  .switch-btn.active.brain  { border-color: var(--accent-r); }
+  .switch-btn.active::before { opacity: 1; }
+  .switch-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    opacity: .5;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .switch-name { font-size: 14px; font-weight: 500; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.4rem;
+    margin-bottom: 1rem;
+    transition: border-color .3s;
+  }
+  .card:focus-within { border-color: var(--border-hi); }
+
+  .card-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  /* ── Drop zone ── */
+  .drop-zone {
+    border: 1px dashed rgba(255,255,255,.12);
+    border-radius: 8px;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.over {
+    border-color: var(--accent);
+    background: rgba(255,255,255,.02);
+  }
+  .drop-icon {
+    width: 40px; height: 40px;
+    border: 1px solid var(--border-hi);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 12px;
+    transition: border-color .2s;
+  }
+  .drop-zone:hover .drop-icon { border-color: var(--accent); }
+  .drop-icon svg { width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 1.5; }
+  .drop-primary { font-size: 13px; color: var(--text); margin-bottom: 4px; }
+  .drop-sub     { font-size: 12px; color: var(--muted); }
+
+  #fileInput { display: none; }
+
+  #preview {
+    width: 100%; max-height: 220px; object-fit: contain;
+    border-radius: 6px; margin-top: 1rem;
+    display: none;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Button ── */
+  .btn {
+    width: 100%; margin-top: 1rem;
+    padding: 11px;
+    font-family: var(--sans);
+    font-size: 13px; font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid var(--border-hi);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all .2s;
+    position: relative; overflow: hidden;
+  }
+  .btn::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .btn:not(:disabled):hover::after { opacity: .07; }
+  .btn:disabled { opacity: .3; cursor: default; }
+  .btn:not(:disabled) { border-color: var(--accent); }
+
+  /* ── Spinner ── */
+  #spinner {
+    display: none;
+    text-align: center;
+    padding: 2rem;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: .08em;
+  }
+  .spin-ring {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Results ── */
+  #results { display: none; }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+  .metric {
+    background: rgba(255,255,255,.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .9rem;
+  }
+  .metric-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .metric-val {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--text);
+  }
+  .metric-val.positive { color: var(--malignant); }
+  .metric-val.negative { color: var(--benign); }
+  .metric-val.brain-tumor { color: var(--accent-r); }
+  .metric-val.no-tumor    { color: var(--benign); }
+
+  /* confidence bar */
+  .bar-track {
+    height: 3px; border-radius: 2px;
+    background: rgba(255,255,255,.06);
+    margin-top: 8px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 2px;
+    background: var(--accent);
+    transition: width .5s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* brain prob breakdown */
+  #brain-breakdown { display: none; margin-bottom: 1rem; }
+  .prob-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 8px;
+  }
+  .prob-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 100px; flex-shrink: 0;
+  }
+  .prob-track {
+    flex: 1; height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,.06); overflow: hidden;
+  }
+  .prob-bar { height: 100%; border-radius: 2px; background: var(--accent-r); }
+  .prob-pct {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 38px; text-align: right; flex-shrink: 0;
+  }
+
+  /* disclaimer */
+  .disclaimer {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.65;
+    padding: .85rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,.02);
+    margin-bottom: 1rem;
+  }
+  .disclaimer strong { color: rgba(255,255,255,.4); font-weight: 500; }
+
+  /* gradcam */
+  .gradcam-img {
+    width: 100%; border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .gradcam-caption {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 10px;
+    line-height: 1.6;
+  }
+
+  /* error */
+  #error-msg {
+    display: none;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--malignant);
+    margin-top: .75rem;
+    padding: .6rem .8rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255,107,107,.2);
+    background: rgba(255,107,107,.05);
+  }
+
+  /* accent transitions */
+  .accent-transition { transition: color .4s, border-color .4s, box-shadow .4s; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo-row">
+      <div class="logo-dot" id="logoDot"></div>
+      <span class="logo-text" id="logoText">Breast histopathology</span>
+    </div>
+    <h1>Medical image<br><em>analysis</em></h1>
+    <p class="tagline">
+      Upload a tissue or MRI scan — the model classifies it and highlights
+      the regions that drove its prediction using GradCAM.
+    </p>
+  </header>
+
+  <!-- Model switcher -->
+  <div class="switcher">
+    <button class="switch-btn breast active" id="btnBreast" onclick="selectModel('breast')">
+      <span class="switch-label">Model 01</span>
+      <span class="switch-name">Breast histopathology</span>
+    </button>
+    <button class="switch-btn brain" id="btnBrain" onclick="selectModel('brain')">
+      <span class="switch-label">Model 02</span>
+      <span class="switch-name">Brain MRI</span>
+    </button>
+  </div>
+
+  <!-- Upload card -->
+  <div class="card">
+    <p class="card-label">Upload image</p>
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <p class="drop-primary" id="dropPrimary">Drop a patch image here</p>
+      <p class="drop-sub">or click to browse — .png / .jpg</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+    <img id="preview" alt="preview">
+    <button class="btn" id="analyseBtn" disabled>Analyse image</button>
+    <p id="error-msg"></p>
+  </div>
+
+  <!-- Spinner -->
+  <div id="spinner">
+    <div class="spin-ring"></div>
+    running inference...
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <div class="card">
+      <p class="card-label">Result</p>
+      <div class="metric-grid">
+        <div class="metric">
+          <p class="metric-label">Prediction</p>
+          <p class="metric-val" id="predLabel">—</p>
+        </div>
+        <div class="metric">
+          <p class="metric-label">Confidence</p>
+          <p class="metric-val" id="confLabel">—</p>
+          <div class="bar-track"><div class="bar-fill" id="confBar" style="width:0%"></div></div>
+        </div>
+        <div class="metric" id="threshCell">
+          <p class="metric-label">Threshold</p>
+          <p class="metric-val" id="threshLabel">—</p>
+        </div>
+      </div>
+
+      <!-- Brain class breakdown (shown only for brain model) -->
+      <div id="brain-breakdown">
+        <p class="card-label" style="margin-bottom:.6rem">Class probabilities</p>
+        <div id="probRows"></div>
+      </div>
+
+      <div class="disclaimer" id="disclaimer"></div>
+    </div>
+
+    <div class="card">
+      <p class="card-label">GradCAM explanation</p>
+      <img id="gradcamImg" class="gradcam-img" alt="GradCAM">
+      <p class="gradcam-caption">
+        <strong style="color:rgba(255,255,255,.35)">Left</strong> original &nbsp;·&nbsp;
+        <strong style="color:rgba(255,255,255,.35)">Middle</strong> heatmap — red/yellow = highest attention &nbsp;·&nbsp;
+        <strong style="color:rgba(255,255,255,.35)">Right</strong> overlay
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  /* ── State ─────────────────────────────────────────── */
+  let selectedModel = 'breast';
+  let selectedFile  = null;
+
+  /* ── Model switch ──────────────────────────────────── */
+  function selectModel(type) {
+    selectedModel = type;
+
+    const isBreast = type === 'breast';
+    const accent   = isBreast ? '#4fc3f7' : '#ef9a9a';
+
+    // toggle buttons
+    document.getElementById('btnBreast').classList.toggle('active', isBreast);
+    document.getElementById('btnBrain').classList.toggle('active', !isBreast);
+
+    // update CSS accent variable
+    document.documentElement.style.setProperty('--accent', accent);
+
+    // update logo
+    document.getElementById('logoDot').style.background    = accent;
+    document.getElementById('logoDot').style.boxShadow     = `0 0 10px ${accent}`;
+    document.getElementById('logoText').style.color        = accent;
+    document.getElementById('logoText').textContent        =
+      isBreast ? 'Breast histopathology' : 'Brain MRI';
+
+    // update drop hint
+    document.getElementById('dropPrimary').textContent =
+      isBreast ? 'Drop a patch image here' : 'Drop an MRI scan here';
+
+    // reset results
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'none';
+  }
+
+  /* ── File handling ─────────────────────────────────── */
+  const dropZone  = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const preview   = document.getElementById('preview');
+  const analyseBtn = document.getElementById('analyseBtn');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('over');
+    handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+
+  function handleFile(file) {
+    if (!file) return;
+    selectedFile = file;
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    analyseBtn.disabled = false;
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'none';
+  }
+
+  /* ── Analyse ───────────────────────────────────────── */
+  analyseBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    analyseBtn.disabled = true;
+    document.getElementById('spinner').style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+
+    try {
+      const res  = await fetch(`/predict/${selectedModel}`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      renderResults(data);
+    } catch (err) {
+      const el = document.getElementById('error-msg');
+      el.textContent = 'Error: ' + err.message;
+      el.style.display = 'block';
+    } finally {
+      document.getElementById('spinner').style.display = 'none';
+      analyseBtn.disabled = false;
+    }
+  });
+
+  /* ── Render results ────────────────────────────────── */
+  function renderResults(data) {
+    const isBreast   = selectedModel === 'breast';
+    const predLabel  = document.getElementById('predLabel');
+    const confLabel  = document.getElementById('confLabel');
+    const confBar    = document.getElementById('confBar');
+    const threshCell = document.getElementById('threshCell');
+    const threshLabel= document.getElementById('threshLabel');
+    const breakdown  = document.getElementById('brain-breakdown');
+    const disclaimer = document.getElementById('disclaimer');
+
+    predLabel.textContent = data.prediction;
+    confLabel.textContent = data.confidence + '%';
+    confBar.style.width   = data.confidence + '%';
+
+    if (isBreast) {
+      // breast: binary result styling
+      const isMal = data.prediction === 'Malignant';
+      predLabel.className = 'metric-val ' + (isMal ? 'positive' : 'negative');
+      threshCell.style.display = '';
+      threshLabel.textContent  = data.threshold_used;
+      breakdown.style.display  = 'none';
+      disclaimer.innerHTML = isMal
+        ? '<strong>Positive for malignancy.</strong> The model was tuned for ≥95% recall — it errs on the side of caution and may flag some benign tissue. This result must be reviewed by a qualified pathologist before any clinical decision.'
+        : '<strong>No malignancy detected.</strong> The model found no evidence of invasive ductal carcinoma in this patch. A negative result does not rule out cancer — always follow clinical protocol.';
+    } else {
+      // brain: 4-class result
+      const isNoTumor = data.prediction === 'No Tumor';
+      predLabel.className = 'metric-val ' + (isNoTumor ? 'no-tumor' : 'brain-tumor');
+      threshCell.style.display = 'none';
+      breakdown.style.display  = 'block';
+
+      // render probability bars
+      const rows = document.getElementById('probRows');
+      rows.innerHTML = '';
+      const classes = ['Glioma', 'Meningioma', 'No Tumor', 'Pituitary'];
+      classes.forEach(cls => {
+        const pct = data.all_probs[cls] || 0;
+        rows.innerHTML += `
+          <div class="prob-row">
+            <span class="prob-name">${cls}</span>
+            <div class="prob-track"><div class="prob-bar" style="width:${pct}%"></div></div>
+            <span class="prob-pct">${pct}%</span>
+          </div>`;
+      });
+
+      disclaimer.innerHTML = isNoTumor
+        ? '<strong>No tumor detected.</strong> The model found no evidence of a brain tumor in this MRI. Always confirm with a radiologist.'
+        : `<strong>${data.prediction} tumor indicated.</strong> This is a classification aid only — not a diagnosis. Results must be interpreted by a qualified radiologist or neurosurgeon.`;
+    }
+
+    document.getElementById('gradcamImg').src =
+      'data:image/png;base64,' + data.gradcam_image;
+
+    document.getElementById('results').style.display = 'block';
+  }
+</script>
+</body>
+</html>
